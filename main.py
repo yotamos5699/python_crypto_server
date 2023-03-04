@@ -1,16 +1,20 @@
-from typing import Any, Generator, List, Dict, NewType, NotRequired, TypeVar, TypedDict, Unpack
+from typing import Any, List, Dict,  NotRequired,  TypedDict
 import pandas as pd
 import concurrent.futures
 import requests
 import models
 import db
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from datetime import datetime
 from pycoingecko import CoinGeckoAPI
+from possition import P_handler
 from strategy import AssetsConfig, GetPrices, Strategy
 from dataclasses import asdict, dataclass
+
 import json
+
+from typs import P_T, Coin_T, CoinTicks, GetPrices_T, MarketData_T, Move, PossitionData, Tick_
 STRATS_URL = 'https://script.google.com/macros/s/AKfycbzh0Jz267JZ_HXGatrE-oJj8fwPHqXAn3G_UkVJX8EJj8m7jSStWeTwa9wHXbFTEVx1Lw/exec?type=getdata'
 
 DB = db.SessionLocal()
@@ -40,19 +44,6 @@ def getUsersData(delay: int) -> Any:
     return res.json()
 
 
-class Coin_T(TypedDict):
-    coin_id: NotRequired[str]
-    last_updated: datetime
-    vs: str
-    value: float
-    counter: NotRequired[int]
-    positions: NotRequired[int]
-
-
-class MarketData_T(TypedDict):
-    id: str
-
-
 def getCoinsID(coin: MarketData_T) -> str:
     return coin['id']
 
@@ -65,31 +56,14 @@ def getInitialData(delay: int) -> Any:
     marketData = cgClient.get_coins_markets(defaultAssetsConfig.pairedCoin, per_page=defaultAssetsConfig.number_assets,
                                             page=1, order=defaultAssetsConfig.sort_method, sparkline=False)
     coinsKeys = list(map(getCoinsID, marketData))
-    return defaultAssetsConfig, defaultStratConfig, coinsKeys
-
-
-class GetPrices_T(TypedDict):
-    ids: list[str]
-    vs_currencies:  list[str] | str
-    precision: NotRequired[int]
-    include_market_cap: NotRequired[bool]
-    include_24hr_vol: NotRequired[bool]
-    include_24hr_change: NotRequired[bool]
-    include_last_updated_at: NotRequired[bool]
-    last_updated: NotRequired[bool]
-
-
-ARGS = {'ids': ['tether', 'bitcoin', 'binance-usd', 'ethereum', 'usd-coin', 'weth', 'ripple', 'blur', 'dogecoin', 'binancecoin', 'matic-network', 'litecoin', 'solana', 'fantom', 'cardano', 'shiba-inu', 'tron',
-                'the-graph', 'optimism', 'aptos', 'polkadot', 'chainlink', 'oasis-network', 'the-sandbox', 'dydx', 'singularitynet', 'lido-dao', 'avalanche-2', 'hashflow', 'mina-protocol'], 'vs_currencies': 'usd', 'precision': 4}
-PRICESUU = {'aptos': {'usd': 14.7739}, 'avalanche-2': {'usd': 18.5493}, 'binancecoin': {'usd': 302.7306}, 'binance-usd': {'usd': 1.0004}, 'bitcoin': {'usd': 22799.0969}, 'blur': {'usd': 0.9297}, 'cardano': {'usd': 0.3892}, 'chainlink': {'usd': 6.9096}, 'dogecoin': {'usd': 0.0861}, 'dydx': {'usd': 2.8351}, 'ethereum': {'usd': 1578.5287}, 'fantom': {'usd': 0.5376}, 'hashflow': {'usd': 0.6956}, 'lido-dao': {'usd': 2.7553}, 'litecoin': {'usd': 97.2818}, 'matic-network': {'usd': 1.2707}, 'mina-protocol': {'usd': 1.1334}, 'oasis-network': {'usd': 0.0816}, 'optimism': {'usd': 2.5448}, 'polkadot': {'usd': 6.2944}, 'ripple': {'usd': 0.386}, 'shiba-inu': {'usd': 0.0}, 'singularitynet': {'usd': 0.4267}, 'solana': {'usd': 22.3211}, 'tether': {'usd': 1.0005}, 'the-graph': {'usd': 0.1789},
-            'the-sandbox': {'usd': 0.7175}, 'tron': {'usd': 0.0694}, 'usd-coin': {'usd': 1.0004}, 'weth': {'usd': 1578.9557}}
+    return defaultAssetsConfig, defaultStratConfig, coinsKeys, usersData['strats']
 
 
 def setInitialCounter(args: GetPrices_T) -> List[Coin_T]:
     now = datetime.now()
-   # #print(args)
+    print('sssssss', now)
     UPDATED_PRICES = cgClient.get_price(**args)
-   # #print(UPDATED_PRICES)
+
     newPrices: List[Coin_T] = []
     for key in args['ids']:
         newPrices.append({"coin_id": key, "value": UPDATED_PRICES[key][args['vs_currencies']], "vs": args['vs_currencies']
@@ -97,8 +71,7 @@ def setInitialCounter(args: GetPrices_T) -> List[Coin_T]:
     return newPrices
 
 
-def deleteCoinFromDB(coin_id: str, coin: Any) -> None:
-    print('deleting coins data !!!!  ', coin_id)
+def deleteCoinFromDB(coin_id: str) -> None:
     DB.query(models.Coins).filter(models.Coins.coin_id == coin_id).delete()
     DB.query(models.CoinsMovments).filter(models.CoinsMovments.coin_id == coin_id).delete()
     DB.commit()
@@ -113,19 +86,15 @@ def mergeCoinsList(oldPrices: List[Coin_T], newPrices: List[Coin_T]) -> List[Coi
         isInNew = False
         for oldPrice in oldPrices:
             if oldPrice['coin_id'] == newPrice['coin_id']:
-
                 isInNew = True
-        # f = {'coin_id': 'wrapped-bitcoin', 'value': 24532.00871566, 'vs': 'usd', 'counter': 0, 'positions': 0, 'last_updated': datetime.datetime(2023, 2, 18, 16, 34, 2, 774525)}
-        # print(isInNew == False, oldPrice['counter'] <= 10, oldPrice['positions'] > 0)
-        # print(isInNew == False and (oldPrice['counter'] <= 10 or oldPrice['positions'] > 0))
+
         if isInNew == False:
             if oldPrice['counter'] <= 10 or oldPrice['positions'] > 0:
-                print('in coin to refresh !!!')
                 coinsToRefetch.append(oldPrice)
                 coinsToFetchIds.append(oldPrice['coin_id'])
             else:
                 if oldPrice['coin_id'] not in deletedIds:
-                    deleteCoinFromDB(oldPrice['coin_id'], oldPrice)
+                    deleteCoinFromDB(oldPrice['coin_id'])
                     deletedIds.append(oldPrice['coin_id'])
         joinedList.append(newPrice)
     refreshedPrices = cgClient.get_price(coinsToFetchIds, newPrices[0]['vs'])
@@ -158,7 +127,6 @@ def update_data_base_coins(prices: List[Coin_T]) -> List[Coin_T]:
             updatedCoin['coin_id'] = coin['coin_id']
             returnedCoins.append(updatedCoin)
         else:
-            print('else new coin !!!!!', coin)
             returnedCoins.append(coin)
 
             DB.add(models.Coins(**coin))
@@ -167,21 +135,6 @@ def update_data_base_coins(prices: List[Coin_T]) -> List[Coin_T]:
 
 
 gaps = [5, 15, 30]
-
-
-class Move(TypedDict):
-    movment_id: NotRequired[int]
-    coin_id: str | Any
-    time_stemp: datetime | Any
-    vs:   str | Any
-    value: float | Any
-    value_5: NotRequired[float]
-    value_15: NotRequired[float]
-    value_30: NotRequired[float]
-    value_60: NotRequired[float]
-
-
-# s = [{'coin_id': 'tether', 'time_stemp': datetime.datetime(2023, 2, 16, 17, 8, 54, 666946), 'vs': 'usd', 'value': 0.99950526}, < models.CoinsMovments object at 0x000002B46347C1D0 > , < models.CoinsMovments object at 0x000002B46347E6D0 > ] {'coin_id': 'tether', 'time_stemp': datetime.datetime(2023, 2, 16, 17, 8, 54, 666946), 'vs': 'usd', 'value': 0.99950526}
 
 
 def setTimeGaps(Moves: List[Move], newMove: Move) -> Move:
@@ -219,7 +172,6 @@ def update_data_base_CoinsMovments(coins: List[Coin_T]) -> None:
         updatedList.append(updatedMovment)
         DB.add(models.CoinsMovments(**updatedMovment))
 
-    print(formatPandasTable(updatedList))
     DB.commit()
 
 
@@ -231,32 +183,227 @@ def formatPandasTable(MERGED_COINS: List[Coin_T] | List[Any]) -> Any:
     return pd.DataFrame(coinTable, columns=columns)
 
 
+timeSig2DbValues = {
+    "1m": "value",
+    "5m": "value_5",
+    "15m": "value_15",
+    "30m": "value_30",
+    "1h": "value_60"
+
+
+}
+
+
+def _Sum(S: int, E: int, L: List[tuple[float, Any]]) -> float | None:
+    sumed: float = 0.0
+    isFloat = True
+    for x in range(S, E):
+        if L[x][0] == None:
+            isFloat = False
+            break
+        sumed += L[x][0]
+    return sumed if isFloat else None
+
+
+def makeTicks(coinsData: List[tuple[float, Any]], strat: Strategy) -> Any:
+    LONG = strat.longEmaRatio
+    SHORT = strat.shortEmaRatio
+
+    Ticks: List[Tick_] = []
+    toShort = False
+
+    if len(coinsData)-LONG-2 < 1:
+        toShort = True
+    # print('len status : ', toShort)
+
+  #  print('to short !!!!', toShort)
+
+    for i in range(1,  len(coinsData)-2 if toShort else len(coinsData)-LONG-2):
+        LV = _Sum(i, (i + 2 if toShort else LONG),  coinsData)
+        SV = _Sum(i, (i + 1 if toShort else SHORT), coinsData)
+        if (LV == None or SV == None):
+            break
+        if (type(LV) == float and type(SV) == float):
+            longTick: float = LV/LONG
+            shortTick: float = SV/SHORT
+
+            tick: Tick_ = {
+                "time_stemp": coinsData[i][1],
+                "long_ema_val": longTick,
+                "short_ema_val": shortTick,
+                "is_long": False if shortTick > longTick else True,
+                "is_short": True if shortTick > longTick else False
+            }
+        else:
+            break
+        # print('sssssssssss', tick)
+        Ticks.append(tick)
+       # print(Ticks)
+    return Ticks
+
+
+def scaneForDeals(strats: List[Strategy], coinsKeys: List[str]) -> Any:
+   # print(' in scane for deals !!!')
+    coinTableData = DB.query(models.CoinsMovments)
+   # print(coinTableData)
+    tsd: Dict[str, tuple[str, int]] = {
+        "1m": ("models.CoinsMovments.value", 300),
+        "5m": ("models.CoinsMovments.value_5", 200),
+        "15m": ("models.CoinsMovments.value_15", 150),
+        "30m": ("models.CoinsMovments.value_30", 100),
+        "1h": ("models.CoinsMovments.value_60", 72)
+    }
+    ticksArrays = []
+    for strat in strats:
+        for coinName in coinsKeys:
+            coinData = coinTableData.with_entities(eval(tsd[strat.baseTimeGap][0]), models.CoinsMovments.time_stemp).filter(
+                models.CoinsMovments.coin_id == coinName).order_by(models.CoinsMovments.time_stemp.desc()).limit(tsd[strat.baseTimeGap][1]).all()
+            if len(coinData) > 2:
+                T = makeTicks(coinData, strat)
+                if len(T) > 1:
+                    ticksArrays.append({
+                        "user_strat": strat,
+                        "coin_id": coinName,
+                        "ticks": T
+                    })
+   # print(ticksArrays)
+    return ticksArrays
+
+
+def validatePossitions(strats: list[Strategy]) -> list[Strategy]:
+    rList: list[Strategy] = []
+    for strat in strats:
+        if strat.isActive and strat.max_open_trades >= strat.current_opend:
+            rList.append(strat)
+    return rList
+
+
+pendingRange = {
+    "1m": 5,
+    "5m": 2,
+    "15m": 1,
+    "30m": 1,
+    "1h": 1
+}
+
+
+def checkIfCrossingUp(T: List[CoinTicks]) -> List[PossitionData] | None:
+    possitionsToOpen: List[PossitionData] = []
+    for ct in T:
+        if len(ct['ticks']) < 2:
+            return None
+        if ct['ticks'][0]['is_long'] and ct['ticks'][1]['is_short']:
+            print('buy signal on: ', ct['coin_id'])
+            possitionsToOpen.append({"coin_id": ct['coin_id'],
+                                     "strat": ct['user_strat']
+                                     })
+    return possitionsToOpen
+
+
+def checkIfCrossingDown(T: List[CoinTicks]) -> List[PossitionData] | None:
+    possitionsToClose: List[PossitionData] = []
+    for ct in T:
+        if len(ct['ticks']) < 2:
+            return None
+        if ct['ticks'][0]['is_short'] and ct['ticks'][1]['is_long']:
+            print('sell signal on: ', ct['coin_id'])
+            possitionsToClose.append({"coin_id": ct['coin_id'],
+                                     "strat": ct['user_strat']
+                                      })
+    return possitionsToClose
+
+
+def openPossitions(pto: List[PossitionData], MERGED_COINS: List[Coin_T]) -> List[P_T]:
+    POSSITIONS: List[P_T] = []
+    for P in pto:
+        ActionsData = DB.query(models.Actions).filter(models.Actions.UserID == P['strat'].userID, models.Actions.isOpen == True).all()
+        NOT_OPEND = True
+        for action in ActionsData:
+            if action.CoinID == P['coin_id']:
+                NOT_OPEND = False
+        if NOT_OPEND:
+            COIN_DATA: Coin_T | None = None
+            for COIN in MERGED_COINS:
+                if COIN['coin_id'] == P['coin_id']:
+                    COIN_DATA = COIN
+            if (COIN_DATA):
+                POSSITIONS.append({'USER_STRAT': P['strat'], 'COIN_DATA': COIN_DATA, 'IS_EXIST': True})
+            else:
+                POSSITIONS.append({'USER_STRAT': P['strat'], 'COIN_DATA': None, 'IS_EXIST': False})
+                # print('allready deleted !!! ', P['coin_id'])
+    return POSSITIONS
+
+
+def validatePBeforeActions(possitionsToOpen: Any, MERGED_COINS: Any) -> List[P_T]:
+    EXISTING_P: List[P_T] = []
+    NOT_EXISTING_P: List[P_T] = []
+    if len(possitionsToOpen) > 0:
+        result: List[P_T] = openPossitions(possitionsToOpen, MERGED_COINS)
+        for r in result:
+            if r['IS_EXIST']:
+                EXISTING_P.append(r)
+            else:
+                NOT_EXISTING_P.append(r)
+    return EXISTING_P
+
+
+def clearOldDbData(delay: int) -> None:
+    time.sleep(delay)
+    table = DB.query(models.CoinsMovments)
+    number_of_rows = table.count()
+    num_of_deleted_rows = table.filter(models.CoinsMovments.time_stemp < datetime.now()-timedelta(hours=36)).delete()
+    print('num of deleted rows: ', num_of_deleted_rows, 'out of: ', number_of_rows)
+    DB.commit()
+
+
+def mainEventLoop(PRICES: Any, coinsKeys: Any,  defaultAssetsConfig: Any, defaultStratConfig: Any,  strats: Any, delay: int) -> Any:
+
+    # print(PRICES, coinsKeys,  defaultAssetsConfig, defaultStratConfig,  strats, delay)
+    time.sleep(delay)
+    print('main event loop')
+    NEW_PRICES = setInitialCounter({'ids': coinsKeys, 'vs_currencies': defaultAssetsConfig.pairedCoin, 'precision': defaultAssetsConfig.precision})
+    MERGED_COINS = mergeCoinsList(PRICES, NEW_PRICES)
+    PRICES = update_data_base_coins(MERGED_COINS)
+    # print(formatPandasTable(PRICES))
+    update_data_base_CoinsMovments(PRICES)
+    VALID_STRATS = validatePossitions([Strategy(**s) for s in strats])
+    T = scaneForDeals(VALID_STRATS, coinsKeys)
+    possitionsToOpen = checkIfCrossingUp(T)
+    possitionsToClose = checkIfCrossingDown(T)
+    if possitionsToOpen:
+        EXISTING_P_to_open: List[P_T] = validatePBeforeActions(possitionsToOpen, MERGED_COINS)
+        for valid_P in EXISTING_P_to_open:
+            if (valid_P['COIN_DATA']['coin_id']):
+                P_handler(valid_P['USER_STRAT'], valid_P['COIN_DATA']).open()
+            else:
+                print('coin T type not found ', valid_P, "\n", "type: ", type(valid_P['COIN_DATA']))
+    if possitionsToClose:
+        EXISTING_P_to_close = validatePBeforeActions(possitionsToClose, MERGED_COINS)
+
+        for valid_P in EXISTING_P_to_close:
+            if (valid_P['COIN_DATA']['coin_id']):
+                P_handler(valid_P['USER_STRAT'], valid_P['COIN_DATA']).close()
+            else:
+                print('coin T type not found ', valid_P, "\n", "type: ", type(valid_P['COIN_DATA']))
+    return PRICES
+
+
 def main() -> None:
-    # print('in main script .....')
+    # ##print('in main script .....')
 
-    defaultAssetsConfig, defaultStratConfig, coinsKeys = getInitialData(0)
+    defaultAssetsConfig, defaultStratConfig, coinsKeys, strats = getInitialData(0)
     PRICES = setInitialCounter({'ids': coinsKeys, 'vs_currencies': defaultAssetsConfig.pairedCoin, 'precision': defaultAssetsConfig.precision})
-
-    # #print(coinsKeys)
+    clearOldDbData(0)
     defaultAssetsConfig.show()
     defaultStratConfig.show()
     while True:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            try:
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+
                 marketData = executor.submit(getInitialData, defaultAssetsConfig.refresh_time_period)
-                defaultAssetsConfig, defaultStratConfig, coinsKeys = marketData.result()
-            except KeyboardInterrupt:
-                print('error i n while loop ', ValueError)
-            NEW_PRICES = setInitialCounter({'ids': coinsKeys, 'vs_currencies': defaultAssetsConfig.pairedCoin, 'precision': defaultAssetsConfig.precision})
-
-            MERGED_COINS = mergeCoinsList(PRICES, NEW_PRICES)
-            # print('**************************MERGED COINS !!!!!************************\n', formatPandasTable(MERGED_COINS))
-            PRICES = update_data_base_coins(MERGED_COINS)
-            # print(PRICES)
-            update_data_base_CoinsMovments(PRICES)
-            print(formatPandasTable(MERGED_COINS))
-
-    #  #print(users_data.result())
-
-
-# main()
+                executor.submit(clearOldDbData, 60*60*6)
+                defaultAssetsConfig, defaultStratConfig, coinsKeys, strats = marketData.result()
+                mainLoopRes = executor.submit(mainEventLoop, PRICES, coinsKeys,  defaultAssetsConfig, defaultStratConfig,  strats,  defaultAssetsConfig.refresh_time_period * 2)
+                PRICES = mainLoopRes.result()
+        except KeyboardInterrupt:
+            executor.shutdown(cancel_futures=True)

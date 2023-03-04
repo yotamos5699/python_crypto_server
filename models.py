@@ -1,24 +1,27 @@
 from typing import Any, Dict
-from sqlalchemy import Column,  Integer, Float, String, DATE, Boolean, ForeignKey
+from sqlalchemy import Column, DateTime,  Integer, Float, String, DATE, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
 
 from db import Base
-from main import Move
 Base = Base
 
 
 class Actions(Base):
     __tablename__ = "actions"
-    id = Column(Integer, primary_key=True, index=True)
-    Time = Column(DATE)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    Time = Column(DateTime)
     UserID = Column(String, unique=False)
-    CoinID = Column(String)
+    CoinID = Column(String, ForeignKey('coins.coin_id'))
     ActionType = Column(String)
-    time_of_atart = Column(DATE)
-    time_of_end = Column(DATE)
+    time_of_atart = Column(DateTime)
+    time_of_end = Column(DateTime, nullable=True)
     value_of_start = Column(Float)
-    value_of_end = Column(Float)
+    value_of_end = Column(Float, nullable=True)
+    start_stuck_value = Column(Float, nullable=True)
+    end_stuck_value = Column(Float, nullable=True)
+    profit_lost_numeric = Column(Float, nullable=True)
+    normelized_commission = Column(Float, nullable=True)
     isOpen = Column(Boolean)
 
 
@@ -35,19 +38,20 @@ class Payments(Base):
 class Coins(Base):
     __tablename__ = "coins"
     coin_id = Column(String, primary_key=True, index=True)
-    last_updated = Column(DATE)
+    last_updated = Column(DateTime)
     vs = Column(String)
     value = Column(Float)
     counter = Column(Integer)
     positions = Column(Integer)
     coins_movments = relationship('CoinsMovments', backref='author')
+    actions = relationship('Actions', backref='author')
 
 
 class CoinsMovments(Base):
     __tablename__ = "coins_movments"
     movment_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     coin_id = Column(String, ForeignKey('coins.coin_id'), index=True)
-    time_stemp = Column(DATE)
+    time_stemp = Column(DateTime)
     vs = Column(String)
     value = Column(Float)
     value_5 = Column(Float, nullable=True)

@@ -9,13 +9,21 @@ import models
 import requests
 import main
 import asyncio
-
+from fastapi.middleware.cors import CORSMiddleware
 import time
 import threading
 
 import uvicorn
 
 app = FastAPI()
+origins = ['http://localhost:3000', 'http://localhost:8000', 'http://127.0.0.1:3000', 'http://0.0.0.0:3000']
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class BackGroundScript(threading.Thread):
@@ -63,48 +71,49 @@ def get_usser(id: int = Path(None,)) -> Any:
 
 @app.get('/actions/{user_id}')
 def getActions(user_id: str | int) -> Any:
-    actions = [
-        {'id': 19827489746, 'Time':  datetime.strptime('19/09/22 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/09/22 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/09/22 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 1.5431},
-        {'id': 99827489746, 'Time':  datetime.strptime('19/10/22 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart': datetime.strptime('19/10/22 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end': datetime.strptime('19/10/22 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.3451, 'value_of_end': 2.5431},
-        {'id': 45627489746, 'Time': datetime.strptime('19/01/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/01/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/01/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.4451, 'value_of_end': 1.5431},
-        {'id': 87827489746, 'Time':  datetime.strptime('03/02/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart': datetime.strptime('03/02/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('03/02/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 4.5431},
-        {'id': 45627489746, 'Time': datetime.strptime('19/01/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'sdfhgdfgudtu', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/01/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/01/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.4451, 'value_of_end': 1.5431},
-        {'id': 87827489746, 'Time':  datetime.strptime('03/02/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'sdfhgdfgudtu', 'CoinID': 'bitcoin', 'isOpen': False,
-         'ActionType': 'buy', 'time_of_atart': datetime.strptime('03/02/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('03/02/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 4.5431},
+    # actions = [
+    #     {'id': 19827489746, 'Time':  datetime.strptime('19/09/22 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/09/22 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/09/22 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 1.5431},
+    #     {'id': 99827489746, 'Time':  datetime.strptime('19/10/22 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart': datetime.strptime('19/10/22 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end': datetime.strptime('19/10/22 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.3451, 'value_of_end': 2.5431},
+    #     {'id': 45627489746, 'Time': datetime.strptime('19/01/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/01/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/01/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.4451, 'value_of_end': 1.5431},
+    #     {'id': 87827489746, 'Time':  datetime.strptime('03/02/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'kashdoasufoausgadg', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart': datetime.strptime('03/02/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('03/02/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 4.5431},
+    #     {'id': 45627489746, 'Time': datetime.strptime('19/01/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'sdfhgdfgudtu', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart':  datetime.strptime('19/01/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('19/01/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 2.4451, 'value_of_end': 1.5431},
+    #     {'id': 87827489746, 'Time':  datetime.strptime('03/02/23 13:55:26', '%d/%m/%y %H:%M:%S'), 'UserID': 'sdfhgdfgudtu', 'CoinID': 'bitcoin', 'isOpen': False,
+    #      'ActionType': 'buy', 'time_of_atart': datetime.strptime('03/02/23 13:56:26', '%d/%m/%y %H:%M:%S'), 'time_of_end':  datetime.strptime('03/02/23 14:56:26', '%d/%m/%y %H:%M:%S'), 'value_of_start': 1.3451, 'value_of_end': 4.5431},
 
-    ]
-    actionsNum = DB.query(models.Actions).count()
-    if actionsNum == 0:
-        for action in actions:
-            DB.add(models.Actions(**action))
-        DB.commit()
-    else:
-        print(f"{actionsNum} actions in db....")
+    # ]
+    # actionsNum = DB.query(models.Actions).count()
+    # if actionsNum == 0:
+    #     for action in actions:
+    #         DB.add(models.Actions(**action))
+    #     DB.commit()
+    # else:
+    #     print(f"{actionsNum} actions in db....")
 
     if user_id == "all":
-        actions_ = DB.query(models.Actions).all()
+        print('in actions aallll')
+        actions_ = DB.query(models.Actions).order_by(models.Actions.Time.desc()).limit(1000).all()
         print(actions_)
         return actions_
     else:
         actions_ = DB.query(models.Actions).filter_by(
-            UserID=user_id).all()
+            UserID=user_id).order_by(models.Actions.Time.desc()).limit(1000).all()
         return actions_
 
 
 @app.get('/movments/{coin_id}')
 def getMovments(coin_id: str = Path(None,)) -> Any:
     if coin_id == "all":
-        movments = DB.query(models.CoinsMovments).all()
+        movments = DB.query(models.CoinsMovments).order_by(models.CoinsMovments.time_stemp.desc()).limit(1000).all()
         print(movments)
         return movments
     else:
         movments = DB.query(models.CoinsMovments).filter_by(
-            coin_id=coin_id).all()
+            coin_id=coin_id).order_by(models.CoinsMovments.time_stemp.desc()).limit(1000).all()
         return movments
 
 
@@ -113,6 +122,7 @@ def getCoins() -> Any:
     coins = DB.query(models.Coins).all()
     print(coins)
     return coins
+
 
     # if __name__ == "__main__":
     #     import uvicorn

@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Any, List, Dict
 from dataclasses import dataclass
 timeValue = {
     "5s": 5,
@@ -42,15 +42,18 @@ class AssetsConfig:
 
 
 class Strategy:
-    def __init__(self, id: str, userID: str, max_open_trades: int, stake_amount: int, tradable_balance_ratio: float, entryTimeOut: int, exitTimeOut: int, timeout_count: int, baseTimeGap: str, shortEmaRatio: int, longEmaRatio: int) -> None:
+    def __init__(self, schema: Any, name: str, isActive: bool, bank: float, id: str, current_opend: int, userID: str, max_open_trades: int, stake_amount: int, tradable_balance_ratio: float, entryTimeOut: int, exitTimeOut: int, timeout_count: int, baseTimeGap: str, shortEmaRatio: int, longEmaRatio: int) -> None:
         self.id = id
         self.userID = userID
+        self.name = name
         self.max_open_trades = max_open_trades
         self.stake_amount = stake_amount
         self.baseTimeGap = baseTimeGap
         self.shortEmaRatio = shortEmaRatio
         self.longEmaRatio = longEmaRatio
-
+        self.current_opend = current_opend
+        self.bank = bank
+        self.isActive = isActive
         self.stake_currency = "USDT"
         # Amount of crypto-currency your bot will use for each trade
 
@@ -81,7 +84,20 @@ class Strategy:
             "price_side": "same",
             "use_order_book": True,
             "order_book_top": 1
-        }
+        },
+        self.schema = schema
+        # {
+
+        #     "precent_from_crossing": {
+        #         "active": True,
+        #         "p_sum": 3
+        #     }
+        # }
+        # self.exit_schema = {
+        #     "precent_from_crossing": {
+        #         "active": True,
+        #         "p_sum": 3
+        #     }
 
     def show(self) -> None:
         print('id: ', self.id,
